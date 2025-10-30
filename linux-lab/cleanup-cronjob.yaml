@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-old-labs
+  namespace: linux-lab
+spec:
+  schedule: "*/10 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: cleaner
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Checking for expired labs..."
+                  now=$(date -u +%s)
+                  for pod in $(kubectl get pods -n linux-lab -l status=active -o jsonpath='{.items[*].metadata.name}'); do
+                    ts=$(kubectl get pod $pod -n linux-lab -o jsonpath='{.metadata.annotations.lastAccess}')
+                    if [ -n "$ts" ]; then
+                      pod_time=$(date -d "$ts" +%s)
+                      diff=$(( (now - pod_time) / 60 ))
+                      if [ "$diff" -gt 60 ]; then
+                        echo "Deleting expired pod: $pod (age: ${diff}m)"
+                        kubectl delete pod $pod -n linux-lab
+                      fi
+                    fi
+                  done
+          restartPolicy: OnFailure
