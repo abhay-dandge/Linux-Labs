@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubuntu-lab
+  namespace: linux-lab
+  labels:
+    app: ubuntu-lab
+    ttl: "1h"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubuntu-lab
+  template:
+    metadata:
+      labels:
+        app: ubuntu-lab
+    spec:
+      containers:
+        - name: ubuntu-shell
+          image: tsl0922/ttyd:latest
+          args: ["bash"]
+          ports:
+            - containerPort: 7681
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+          securityContext:
+            runAsUser: 0
+      restartPolicy: Always
