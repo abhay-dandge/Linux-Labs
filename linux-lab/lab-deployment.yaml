@@ -19,30 +19,31 @@ spec:
     spec:
       serviceAccountName: lab-updater
       containers:
-        - name: ubuntu-shell
-          image: tsl0922/ttyd:latest
+        - name: wetty
+          image: wettyoss/wetty:latest
           command: ["/bin/sh", "-c"]
           args:
             - |
-              echo "Waiting for user access..."
-              # Start ttyd, and on first connection, update pod status label
-              ttyd --once bash &
+              echo "Starting Web Terminal..."
+              # Launch Wetty (binds to port 3000)
+              node app.js &
+
               PID=$!
+              echo "Monitoring user access..."
               sleep 3
-              echo "ttyd started. Monitoring access..."
               while true; do
                 if ! ps -p $PID > /dev/null; then
-                  echo "User accessed the lab. Marking pod active..."
+                  echo "User accessed the lab. Marking as active..."
                   kubectl patch pod $HOSTNAME -n linux-lab \
                     -p '{"metadata":{"labels":{"status":"active"},"annotations":{"lastAccess":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}}}'
                   sleep 3600
-                  echo "Session expired after 1 hour. Exiting..."
+                  echo "Session expired after 1 hour. Cleaning up..."
                   exit 0
                 fi
                 sleep 5
               done
           ports:
-            - containerPort: 7681
+            - containerPort: 3000
           resources:
             limits:
               cpu: "500m"
@@ -52,4 +53,4 @@ spec:
               memory: "256Mi"
           securityContext:
             runAsUser: 0
-      restartPolicy: Always
+      restartPolicy: Never
