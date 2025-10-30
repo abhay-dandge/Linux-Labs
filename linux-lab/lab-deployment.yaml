@@ -15,11 +15,32 @@ spec:
     metadata:
       labels:
         app: ubuntu-lab
+        status: waiting
     spec:
+      serviceAccountName: lab-updater
       containers:
         - name: ubuntu-shell
           image: tsl0922/ttyd:latest
-          args: ["bash"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Waiting for user access..."
+              # Start ttyd, and on first connection, update pod status label
+              ttyd --once bash &
+              PID=$!
+              sleep 3
+              echo "ttyd started. Monitoring access..."
+              while true; do
+                if ! ps -p $PID > /dev/null; then
+                  echo "User accessed the lab. Marking pod active..."
+                  kubectl patch pod $HOSTNAME -n linux-lab \
+                    -p '{"metadata":{"labels":{"status":"active"},"annotations":{"lastAccess":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}}}'
+                  sleep 3600
+                  echo "Session expired after 1 hour. Exiting..."
+                  exit 0
+                fi
+                sleep 5
+              done
           ports:
             - containerPort: 7681
           resources:
@@ -31,4 +52,4 @@ spec:
               memory: "256Mi"
           securityContext:
             runAsUser: 0
-      restartPolicy: Always
+      restartPolicy: Never
